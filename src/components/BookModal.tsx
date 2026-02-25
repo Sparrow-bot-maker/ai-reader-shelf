@@ -276,46 +276,52 @@ const BookModal = ({ book, onClose }: BookModalProps) => {
         <div className="fixed inset-0 z-[100] flex items-stretch justify-end overflow-hidden">
             <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={handleClose} />
 
-            <div className="relative w-full max-w-[95%] lg:max-w-[1200px] h-full bg-[#0f172a] border-l border-white/10 shadow-2xl flex flex-col overflow-hidden animate-slide-in-right">
+            <div className="relative w-full max-w-[95%] lg:max-w-[1200px] h-[90vh] sm:h-full bg-[#0f172a] border-l border-white/10 shadow-2xl flex flex-col overflow-hidden animate-slide-in-right rounded-t-3xl sm:rounded-none">
 
                 {/* Header */}
-                <div className="flex items-center justify-between px-6 py-4 bg-white/5 border-b border-white/10 shrink-0">
-                    <div className="flex items-center gap-4">
+                <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 bg-white/5 border-b border-white/10 shrink-0">
+                    <div className="flex items-center gap-2 sm:gap-4 overflow-hidden">
                         <img
                             src={book.cover || `https://placehold.co/40x40/1e293b/3b82f6?text=📚`}
-                            className="w-10 h-10 object-cover rounded-md shadow-lg"
+                            className="w-8 h-8 sm:w-10 sm:h-10 object-cover rounded-md shadow-lg shrink-0"
                             alt=""
                         />
-                        <div>
-                            <h2 className="text-xl font-bold text-white leading-none">{book.title}</h2>
-                            <p className="text-xs text-slate-400 mt-1">{book.author} · {book.category}</p>
+                        <div className="overflow-hidden">
+                            <h2 className="text-sm sm:text-xl font-bold text-white leading-tight truncate">{book.title}</h2>
+                            <p className="text-[10px] sm:text-xs text-slate-400 mt-0.5 truncate">{book.author}</p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1 sm:gap-2">
                         <button
                             onClick={handleToggleStatus}
-                            className="flex items-center gap-2 px-3 py-2 bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 border border-blue-500/20 rounded-lg text-xs font-medium transition-all"
+                            className="flex items-center gap-2 px-2.5 sm:px-3 py-2 sm:py-2.5 bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 border border-blue-500/20 rounded-lg text-[10px] sm:text-xs font-medium transition-all min-h-[44px]"
+                            title={`標記為${book.status === '想閱讀' ? '已閱讀' : '想閱讀'}`}
                         >
                             <RefreshCcw className="w-3.5 h-3.5" />
-                            標記為{book.status === '想閱讀' ? '已閱讀' : '想閱讀'}
+                            <span className="hidden sm:inline">標記為{book.status === '想閱讀' ? '已閱讀' : '想閱讀'}</span>
                         </button>
                         <button
                             onClick={handleDelete}
-                            className="p-2 hover:bg-red-500/10 rounded-full transition-colors text-slate-400 hover:text-red-400"
-                            title="刪除書籍"
+                            className="p-2.5 sm:p-2 hover:bg-red-500/10 rounded-full transition-colors text-slate-400 hover:text-red-400 min-w-[44px] min-h-[44px] flex items-center justify-center"
+                            title="刪除"
                         >
                             <Trash2 className="w-5 h-5" />
                         </button>
-                        <div className="w-px h-6 bg-white/10 mx-1" />
+                        <div className="w-px h-6 bg-white/10 mx-0.5 sm:mx-1" />
                         <button
                             onClick={handleSave}
                             disabled={isSaving}
-                            className="flex items-center gap-2 px-3 py-2 bg-green-600/20 hover:bg-green-600/40 text-green-400 border border-green-500/20 rounded-lg text-xs font-medium transition-all disabled:opacity-50"
+                            className="flex items-center gap-2 px-2.5 sm:px-3 py-2 sm:py-2.5 bg-green-600/20 hover:bg-green-600/40 text-green-400 border border-green-500/20 rounded-lg text-[10px] sm:text-xs font-medium transition-all disabled:opacity-50 min-h-[44px]"
+                            title="儲存"
                         >
                             {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                            儲存進度
+                            <span className="hidden sm:inline">儲存</span>
                         </button>
-                        <button onClick={handleClose} className="p-2 hover:bg-white/10 rounded-full transition-colors text-slate-400 hover:text-white">
+                        <button
+                            onClick={handleClose}
+                            className="p-2 sm:p-2 hover:bg-white/10 rounded-full transition-colors text-slate-400 hover:text-white min-w-[44px] min-h-[44px] flex items-center justify-center"
+                            aria-label="Close"
+                        >
                             <X className="w-6 h-6" />
                         </button>
                     </div>
@@ -325,7 +331,7 @@ const BookModal = ({ book, onClose }: BookModalProps) => {
                 <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
 
                     {/* Chat */}
-                    <div className="w-full md:w-[400px] lg:w-[450px] flex flex-col border-r border-white/10 bg-black/20 shrink-0">
+                    <div className="w-full md:w-[400px] lg:w-[450px] flex flex-col border-b md:border-b-0 md:border-r border-white/10 bg-black/20 shrink-0 h-[60%] md:h-full">
                         <div className="flex-1 overflow-y-auto p-6 space-y-4">
                             {messages.map((m, i) => (
                                 <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
@@ -374,10 +380,10 @@ const BookModal = ({ book, onClose }: BookModalProps) => {
                     </div>
 
                     {/* Mind Map */}
-                    <div className="flex-1 relative bg-[#0a0f1d] overflow-hidden">
-                        <div className="absolute top-4 left-4 z-10">
-                            <span className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/10 text-blue-400 rounded-full text-xs font-bold border border-blue-500/20 backdrop-blur-md">
-                                <Network className="w-3.5 h-3.5" />
+                    <div className="flex-1 relative bg-[#0a0f1d] overflow-hidden min-h-[300px] md:min-h-0">
+                        <div className="absolute top-3 left-3 sm:top-4 sm:left-4 z-10 pointer-events-none">
+                            <span className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/10 text-blue-400 rounded-full text-[10px] sm:text-xs font-bold border border-blue-500/20 backdrop-blur-md">
+                                <Network className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                                 AI 思維導圖 · {nodes.length - 1} 個概念
                             </span>
                         </div>

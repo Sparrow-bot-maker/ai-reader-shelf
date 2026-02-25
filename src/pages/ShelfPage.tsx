@@ -121,14 +121,14 @@ const ShelfPage: React.FC<ShelfPageProps> = ({ status }) => {
     }
 
     return (
-        <div className="space-y-12 animate-fade-in">
-            <div className="flex items-center justify-between">
-                <h1 className="text-4xl font-extrabold text-white tracking-tight">
+        <div className="space-y-6 sm:space-y-12 animate-fade-in px-2 sm:px-0">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
                     {status === '想閱讀' ? '待讀清單' : '知識寶庫'}
                 </h1>
                 <button
                     onClick={() => setIsAddModalOpen(true)}
-                    className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-bold transition-all shadow-lg shadow-blue-600/20 active:scale-95 group"
+                    className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3.5 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-bold transition-all shadow-lg shadow-blue-600/20 active:scale-95 group min-h-[48px]"
                 >
                     <Plus className="w-5 h-5 transition-transform group-hover:rotate-90" />
                     新增書籍
@@ -136,10 +136,10 @@ const ShelfPage: React.FC<ShelfPageProps> = ({ status }) => {
             </div>
 
             <div className="flex flex-col gap-6">
-                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar -mx-2 px-2 sm:mx-0 sm:px-0">
                     <button
                         onClick={() => setSelectedCategory(null)}
-                        className={`px-4 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap ${!selectedCategory ? 'bg-blue-600 text-white' : 'bg-white/5 text-slate-400 hover:text-white border border-white/10'}`}
+                        className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all whitespace-nowrap min-h-[44px] flex items-center ${!selectedCategory ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'bg-white/5 text-slate-400 hover:text-white border border-white/10'}`}
                     >
                         全部書籍
                     </button>
@@ -147,7 +147,7 @@ const ShelfPage: React.FC<ShelfPageProps> = ({ status }) => {
                         <button
                             key={cat}
                             onClick={() => setSelectedCategory(cat)}
-                            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap ${selectedCategory === cat ? 'bg-blue-600 text-white' : 'bg-white/5 text-slate-400 hover:text-white border border-white/10'}`}
+                            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all whitespace-nowrap min-h-[44px] flex items-center ${selectedCategory === cat ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'bg-white/5 text-slate-400 hover:text-white border border-white/10'}`}
                         >
                             {cat}
                         </button>
@@ -156,14 +156,14 @@ const ShelfPage: React.FC<ShelfPageProps> = ({ status }) => {
             </div>
 
             {finalBooks.length > 0 ? (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-8">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-8">
                     {finalBooks.map(book => (
                         <BookCard key={book.id} book={book} onClick={() => setSelectedBook(book)} />
                     ))}
                 </div>
             ) : (
                 <div className="text-center py-20 bg-white/5 rounded-3xl border border-dashed border-white/10">
-                    <p className="text-slate-500">此分類目前沒有書籍</p>
+                    <p className="text-slate-500 text-sm">此分類目前沒有書籍</p>
                 </div>
             )}
 
