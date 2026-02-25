@@ -31,6 +31,7 @@ jobs:
         env:
           VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
           VITE_GAS_URL: ${{ secrets.VITE_GAS_URL }}
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
 
       - name: Setup Pages
         uses: actions/configure-pages@v4

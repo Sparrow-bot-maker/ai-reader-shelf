@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { User, X, LogIn } from 'lucide-react';
+import { GoogleLogin } from '@react-oauth/google';
+import { jwtDecode } from 'jwt-decode';
 
 interface UserLoginModalProps {
     isOpen: boolean;
@@ -26,6 +28,16 @@ const UserLoginModal = ({ isOpen, onClose, onLogin }: UserLoginModalProps) => {
         onClose();
     };
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const handleGoogleSuccess = (credentialResponse: any) => {
+        const decoded: any = jwtDecode(credentialResponse.credential);
+        const googleId = decoded.email; // 或者使用 decoded.sub (唯一標識碼)
+
+        localStorage.setItem('userId', googleId);
+        onLogin(googleId);
+        onClose();
+    };
+
     if (!isOpen) return null;
 
     return (
@@ -44,37 +56,55 @@ const UserLoginModal = ({ isOpen, onClose, onLogin }: UserLoginModalProps) => {
                     <div className="w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center mb-4 border border-blue-500/30">
                         <User className="w-8 h-8 text-blue-400" />
                     </div>
-                    <h2 className="text-2xl font-bold text-white mb-2">設定 User ID</h2>
-                    <p className="text-slate-400 text-sm">輸入你的 ID 以同步書架進度與個人導圖資料</p>
+                    <h2 className="text-2xl font-bold text-white mb-2">登入以同步書架</h2>
+                    <p className="text-slate-400 text-sm">使用 Google 帳戶或自定義 ID 以保存進度</p>
                 </div>
 
-                <form onSubmit={handleSubmit} className="space-y-6">
-                    <div className="space-y-2">
-                        <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider ml-1">
-                            Username / ID
-                        </label>
-                        <input
-                            type="text"
-                            value={userId}
-                            onChange={(e) => setUserId(e.target.value)}
-                            placeholder="例如: user123"
-                            autoFocus
-                            className="w-full bg-slate-900/50 border border-white/10 rounded-2xl px-5 py-4 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all text-lg"
+                <div className="space-y-6">
+                    <div className="flex justify-center">
+                        <GoogleLogin
+                            onSuccess={handleGoogleSuccess}
+                            onError={() => console.log('Login Failed')}
+                            useOneTap
+                            theme="filled_blue"
+                            shape="pill"
+                            width="320"
                         />
                     </div>
 
-                    <button
-                        type="submit"
-                        disabled={!userId.trim()}
-                        className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-600/20 group"
-                    >
-                        <LogIn className="w-5 h-5 transition-transform group-hover:translate-x-1" />
-                        開始使用
-                    </button>
-                </form>
+                    <div className="relative flex items-center justify-center">
+                        <div className="absolute inset-0 flex items-center">
+                            <div className="w-full border-t border-white/10"></div>
+                        </div>
+                        <span className="relative px-4 bg-[#1e293b] text-xs text-slate-500 uppercase tracking-widest font-bold">
+                            或使用自定 ID
+                        </span>
+                    </div>
 
-                <p className="mt-6 text-center text-[11px] text-slate-500">
-                    ID 將儲存於本地瀏覽器，用於過濾 Google Sheets 資料
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                        <div className="space-y-2">
+                            <input
+                                type="text"
+                                value={userId}
+                                onChange={(e) => setUserId(e.target.value)}
+                                placeholder="例如: user123"
+                                className="w-full bg-slate-900/50 border border-white/10 rounded-2xl px-5 py-4 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all text-lg"
+                            />
+                        </div>
+
+                        <button
+                            type="submit"
+                            disabled={!userId.trim()}
+                            className="w-full bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 transition-all transition-colors group"
+                        >
+                            <LogIn className="w-5 h-5 transition-transform group-hover:translate-x-1" />
+                            開始使用
+                        </button>
+                    </form>
+                </div>
+
+                <p className="mt-6 text-center text-[10px] text-slate-500">
+                    使用 Google 登入後，Email 將作為您的唯一標識碼
                 </p>
             </div>
         </div>

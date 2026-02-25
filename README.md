@@ -12,6 +12,7 @@ cp .env.example .env.local
 在 `.env.local` 中填入以下資訊：
 - `VITE_GEMINI_API_KEY`: 從 [Google AI Studio](https://aistudio.google.com/) 取得。
 - `VITE_GAS_URL`: 你的 Google Apps Script Web App 網址。
+- `VITE_GOOGLE_CLIENT_ID`: 從 [Google Cloud Console](https://console.cloud.google.com/) 建立 OAuth 2.0 用戶端 ID 取得。
 
 ### 2. 安裝與執行
 ```bash
@@ -30,6 +31,7 @@ npm run dev
    前往你的 GitHub 儲存庫 `Settings > Secrets and variables > Actions`，新增以下兩個 Secrets：
    - `VITE_GEMINI_API_KEY`: 你的 Gemini API 密鑰。
    - `VITE_GAS_URL`: 你的 GAS Web App URL。
+   - `VITE_GOOGLE_CLIENT_ID`: 你的 Google OAuth Client ID。
 
 2. **啟用 GitHub Pages**：
    前往 `Settings > Pages`，在 **Build and deployment > Source** 選擇 `GitHub Actions`。
