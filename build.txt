@@ -1,0 +1,20 @@
+
+> my-web-project@0.0.0 build
+> tsc -b && vite build
+
+[36mvite v7.3.1 [32mbuilding client environment for production...[36m[39m
+transforming...
+[32m✓[39m 4 modules transformed.
+[31m✗[39m Build failed in 621ms
+[31merror during build:
+[31m[vite:css] [postcss] It looks like you're trying to use `tailwindcss` directly as a PostCSS plugin. The PostCSS plugin has moved to a separate package, so to continue using Tailwind CSS with PostCSS you'll need to install `@tailwindcss/postcss` and update your PostCSS configuration.[31m
+file: [36mC:/my web project/src/index.css:undefined:NaN[31m
+    at at (C:\my web project\node_modules\tailwindcss\dist\lib.js:38:1643)
+    at LazyResult.runOnRoot (C:\my web project\node_modules\postcss\lib\lazy-result.js:361:16)
+    at LazyResult.runAsync (C:\my web project\node_modules\postcss\lib\lazy-result.js:290:26)
+    at async runPostCSS (file:///C:/my%20web%20project/node_modules/vite/dist/node/chunks/config.js:30145:19)
+    at async compilePostCSS (file:///C:/my%20web%20project/node_modules/vite/dist/node/chunks/config.js:30129:6)
+    at async compileCSS (file:///C:/my%20web%20project/node_modules/vite/dist/node/chunks/config.js:30059:26)
+    at async Object.handler (file:///C:/my%20web%20project/node_modules/vite/dist/node/chunks/config.js:29592:54)
+    at async transform (file:///C:/my%20web%20project/node_modules/rollup/dist/es/shared/node-entry.js:21269:16)
+    at async ModuleLoader.addModuleSource (file:///C:/my%20web%20project/node_modules/rollup/dist/es/shared/node-entry.js:21497:36)[39m
