@@ -4,7 +4,7 @@ import ShelfPage from './pages/ShelfPage';
 
 function App() {
   return (
-    <Router>
+    <Router basename="/ai-reader-shelf">
       <div className="min-h-screen bg-[#0f172a] text-slate-200 selection:bg-blue-500/30">
         {/* 背景漸層 */}
         <div className="fixed inset-0 pointer-events-none overflow-hidden">
