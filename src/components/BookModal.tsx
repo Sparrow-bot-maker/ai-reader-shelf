@@ -23,7 +23,7 @@ interface BookModalProps {
     onClose: () => void;
 }
 
-const GAS_URL = import.meta.env.VITE_GAS_URL || 'https://script.google.com/macros/s/AKfycbzokwdbavRyVLnnI2LB6QqBJxea8Qw2eUlz9nr0Uv6FU1vzBD4925xcbRuugDz54G3n/exec';
+const GAS_URL = import.meta.env.VITE_GAS_URL;
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${import.meta.env.VITE_GEMINI_API_KEY}`;
 const NODE_COLORS = ['#3b82f6', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'];
 

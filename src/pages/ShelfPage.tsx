@@ -17,7 +17,7 @@ interface ShelfPageProps {
     status: '想閱讀' | '已閱讀';
 }
 
-const GAS_URL = import.meta.env.VITE_GAS_URL || 'https://script.google.com/macros/s/AKfycbzokwdbavRyVLnnI2LB6QqBJxea8Qw2eUlz9nr0Uv6FU1vzBD4925xcbRuugDz54G3n/exec';
+const GAS_URL = import.meta.env.VITE_GAS_URL;
 
 const ShelfPage: React.FC<ShelfPageProps> = ({ status }) => {
     const [books, setBooks] = useState<Book[]>([]);
