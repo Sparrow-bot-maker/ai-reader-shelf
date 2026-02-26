@@ -15,10 +15,11 @@ const Navbar = () => {
     const [userId, setUserId] = useState<string | null>(localStorage.getItem('userId'));
 
     useEffect(() => {
-        if (!userId) {
+        // 如果未登入且不在登入頁面，才自動開啟彈窗
+        if (!userId && location.pathname !== '/login') {
             setIsLoginOpen(true);
         }
-    }, [userId]);
+    }, [userId, location.pathname]);
 
     const handleLogin = (id: string) => {
         setUserId(id);

@@ -139,7 +139,7 @@ const LoginPage = () => {
                             <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
                             <input
                                 type="email"
-                                placeholder="Email (可選/用於找回密碼)"
+                                placeholder="Email (可選，用於找回密碼)"
                                 value={email}
                                 onChange={e => setEmail(e.target.value)}
                                 className="w-full bg-slate-900/50 border border-white/10 rounded-2xl pl-12 pr-24 py-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"

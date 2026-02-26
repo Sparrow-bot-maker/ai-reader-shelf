@@ -57,7 +57,7 @@ const UserLoginModal = ({ isOpen, onClose, onLogin }: UserLoginModalProps) => {
 
                     <div className="relative flex items-center py-2">
                         <div className="flex-grow border-t border-white/10"></div>
-                        <span className="flex-shrink mx-4 text-slate-500 text-xs uppercase tracking-widest font-bold">或使用自定義帳號</span>
+                        <span className="flex-shrink mx-4 text-slate-500 text-xs uppercase tracking-widest font-bold">或使用 ID 帳密登入</span>
                         <div className="flex-grow border-t border-white/10"></div>
                     </div>
 

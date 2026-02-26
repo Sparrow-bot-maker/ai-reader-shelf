@@ -24,7 +24,7 @@ interface BookModalProps {
     onClose: () => void;
 }
 
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${import.meta.env.VITE_GEMINI_API_KEY}`;
+// const GEMINI_URL = ... (Moved into handleSend for better debugging)
 const NODE_COLORS = ['#3b82f6', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'];
 
 const BookModal = ({ book, onClose }: BookModalProps) => {
@@ -168,6 +168,15 @@ const BookModal = ({ book, onClose }: BookModalProps) => {
         setIsLoading(true);
 
         try {
+            const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+            console.log('Debug: API Key starts with:', apiKey?.substring(0, 7));
+
+            // 偵測是否使用了已失效或舊的金鑰
+            if (!apiKey || apiKey === 'YOUR_GEMINI_API_KEY' || apiKey.startsWith('AIzaSyD6B_SnyAdYaXagaI4TzxzO1T6AhVOYlP0')) {
+                throw new Error('API Key 無效或已過期。請在 .env.local 中填入「新產生的」金鑰，並重啟 npm run dev。');
+            }
+
+            const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${apiKey}`;
             const systemPrompt = `你是一個專業的讀書助理，正在幫使用者討論《${book.title}》（作者：${book.author}，分類：${book.category}）。請以 JSON 格式回覆，包含：1. "text": 對話回覆（繁體中文，自然有深度） 2. "keywords": 從回覆提取 2-4 個核心概念（繁體中文詞語陣列）。只回傳 JSON，不要有其他文字。`;
 
             // messages.slice(1) 跳過初始 AI 打招呼，確保 contents 以 user 開頭
