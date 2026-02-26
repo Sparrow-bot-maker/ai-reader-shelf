@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
-import { User, X, LogIn } from 'lucide-react';
+import { X, LogIn, User } from 'lucide-react';
 import { GoogleLogin } from '@react-oauth/google';
 import { jwtDecode } from 'jwt-decode';
+import { AuthService } from '../services/AuthService';
 
 interface UserLoginModalProps {
     isOpen: boolean;
@@ -10,32 +10,15 @@ interface UserLoginModalProps {
 }
 
 const UserLoginModal = ({ isOpen, onClose, onLogin }: UserLoginModalProps) => {
-    const [userId, setUserId] = useState('');
-    const [savedId] = useState<string | null>(localStorage.getItem('userId'));
-
-    useEffect(() => {
-        if (savedId) {
-            setUserId(savedId);
-        }
-    }, [savedId]);
-
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!userId.trim()) return;
-
-        localStorage.setItem('userId', userId.trim());
-        onLogin(userId.trim());
-        onClose();
-    };
-
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const handleGoogleSuccess = (credentialResponse: any) => {
         const decoded: any = jwtDecode(credentialResponse.credential);
-        const googleId = decoded.email; // 或者使用 decoded.sub (唯一標識碼)
+        const googleId = decoded.email;
 
-        localStorage.setItem('userId', googleId);
+        AuthService.saveSession(googleId, googleId);
         onLogin(googleId);
         onClose();
+        window.location.reload(); // 重新整理以確保 ShelfPage 重新抓取資料
     };
 
     if (!isOpen) return null;
@@ -57,7 +40,7 @@ const UserLoginModal = ({ isOpen, onClose, onLogin }: UserLoginModalProps) => {
                         <User className="w-8 h-8 text-blue-400" />
                     </div>
                     <h2 className="text-2xl font-bold text-white mb-2">登入以同步書架</h2>
-                    <p className="text-slate-400 text-sm">使用 Google 帳戶或自定義 ID 以保存進度</p>
+                    <p className="text-slate-400 text-sm">請自定義 ID 登入或使用 Google 帳戶</p>
                 </div>
 
                 <div className="space-y-6">
@@ -72,39 +55,31 @@ const UserLoginModal = ({ isOpen, onClose, onLogin }: UserLoginModalProps) => {
                         />
                     </div>
 
-                    <div className="relative flex items-center justify-center">
-                        <div className="absolute inset-0 flex items-center">
-                            <div className="w-full border-t border-white/10"></div>
-                        </div>
-                        <span className="relative px-4 bg-[#1e293b] text-xs text-slate-500 uppercase tracking-widest font-bold">
-                            或使用自定 ID
-                        </span>
+                    <div className="relative flex items-center py-2">
+                        <div className="flex-grow border-t border-white/10"></div>
+                        <span className="flex-shrink mx-4 text-slate-500 text-xs uppercase tracking-widest font-bold">或使用自定義帳號</span>
+                        <div className="flex-grow border-t border-white/10"></div>
                     </div>
 
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                        <div className="space-y-2">
-                            <input
-                                type="text"
-                                value={userId}
-                                onChange={(e) => setUserId(e.target.value)}
-                                placeholder="例如: user123"
-                                className="w-full bg-slate-900/50 border border-white/10 rounded-2xl px-5 py-4 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all text-lg"
-                            />
-                        </div>
-
+                    <div className="flex justify-center">
                         <button
-                            type="submit"
-                            disabled={!userId.trim()}
-                            className="w-full bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 transition-all transition-colors group"
+                            onClick={() => {
+                                onClose();
+                                // 導航至新的登入頁面
+                                const baseUrl = window.location.pathname.includes('/ai-reader-shelf') ? '/ai-reader-shelf/login' : '/login';
+                                window.location.pathname = baseUrl;
+                            }}
+                            className="w-full bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 border border-blue-500/20 font-bold py-4 rounded-2xl flex items-center justify-center gap-2 transition-all group"
                         >
                             <LogIn className="w-5 h-5 transition-transform group-hover:translate-x-1" />
-                            開始使用
+                            帳號密碼登入 / 註冊
                         </button>
-                    </form>
+                    </div>
                 </div>
 
-                <p className="mt-6 text-center text-[10px] text-slate-500">
-                    使用 Google 登入後，Email 將作為您的唯一標識碼
+                <p className="mt-8 text-center text-[10px] text-slate-500 leading-relaxed">
+                    為了您的資安，現在我們改用密碼登入方式。<br />
+                    首次使用的 ID 請點擊按鈕後進行「註冊」。
                 </p>
             </div>
         </div>

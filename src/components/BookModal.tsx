@@ -3,6 +3,7 @@ import { X, Send, Sparkles, Network, Loader2, Save, Trash2, RefreshCcw } from 'l
 import { ReactFlow, Background, Controls } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import axios from 'axios';
+import { AuthService } from '../services/AuthService';
 
 interface Book {
     id: string;
@@ -23,7 +24,6 @@ interface BookModalProps {
     onClose: () => void;
 }
 
-const GAS_URL = import.meta.env.VITE_GAS_URL;
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${import.meta.env.VITE_GEMINI_API_KEY}`;
 const NODE_COLORS = ['#3b82f6', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'];
 
@@ -69,9 +69,10 @@ const BookModal = ({ book, onClose }: BookModalProps) => {
     useEffect(() => {
         const fetchHistory = async () => {
             try {
-                const response = await axios.get(GAS_URL);
-                const allBooks = response.data.data || response.data;
-                const currentBook = allBooks.find((b: any) => b.Book_ID === book.id || (b.Title === book.title && b.User_ID === localStorage.getItem('userId')));
+                const userId = localStorage.getItem('userId') || 'guest';
+                const resData = await AuthService.getBooks(userId);
+                const allBooks = resData.data || [];
+                const currentBook = allBooks.find((b: any) => b.Book_ID === book.id || (b.Title === book.title && b.User_ID === userId));
 
                 if (currentBook) {
                     if (currentBook.Chat_History && currentBook.Chat_History !== '[]') {
@@ -221,15 +222,12 @@ const BookModal = ({ book, onClose }: BookModalProps) => {
         setIsSaving(true);
         try {
             const userId = localStorage.getItem('userId') || 'guest';
-            await axios.post(GAS_URL, JSON.stringify({
-                action: 'updateBook',
+            await AuthService.updateBook({
                 Book_ID: book.id,
                 Title: book.title,
                 User_ID: userId,
                 Chat_History: JSON.stringify(messages),
                 Mind_Map_Data: JSON.stringify({ nodes, edges }),
-            }), {
-                headers: { 'Content-Type': 'text/plain' }
             });
         } finally {
             setIsSaving(false);
@@ -240,12 +238,7 @@ const BookModal = ({ book, onClose }: BookModalProps) => {
         if (!window.confirm('你確定要狠心刪除這本書嗎？這將無法復原喔！')) return;
 
         try {
-            await axios.post(GAS_URL, JSON.stringify({
-                action: 'delete',
-                Book_ID: book.id
-            }), {
-                headers: { 'Content-Type': 'text/plain' }
-            });
+            await AuthService.deleteBook(book.id);
             onClose();
             window.location.reload(); // 簡單起見，直接刷新頁面
         } catch (err) {
@@ -257,14 +250,11 @@ const BookModal = ({ book, onClose }: BookModalProps) => {
     const handleToggleStatus = async () => {
         const newStatus = book.status === '想閱讀' ? '已閱讀' : '想閱讀';
         try {
-            await axios.post(GAS_URL, JSON.stringify({
-                action: 'updateBook',
+            await AuthService.updateBook({
                 Book_ID: book.id,
                 Status: newStatus,
                 Title: book.title,
                 User_ID: localStorage.getItem('userId') || 'guest'
-            }), {
-                headers: { 'Content-Type': 'text/plain' }
             });
             onClose();
             window.location.reload();

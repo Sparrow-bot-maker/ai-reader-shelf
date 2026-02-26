@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import BookCard from '../components/BookCard';
 import BookModal from '../components/BookModal';
-import { Loader2, Plus, Save, X } from 'lucide-react';
+import { Loader2, Plus, Save, X, Mail } from 'lucide-react';
+import { AuthService } from '../services/AuthService';
 
 interface Book {
     id: string;
@@ -17,7 +17,6 @@ interface ShelfPageProps {
     status: '想閱讀' | '已閱讀';
 }
 
-const GAS_URL = import.meta.env.VITE_GAS_URL;
 
 const ShelfPage: React.FC<ShelfPageProps> = ({ status }) => {
     const [books, setBooks] = useState<Book[]>([]);
@@ -27,6 +26,10 @@ const ShelfPage: React.FC<ShelfPageProps> = ({ status }) => {
     const [selectedBook, setSelectedBook] = useState<Book | null>(null);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isBindModalOpen, setIsBindModalOpen] = useState(false);
+    const [bindEmail, setBindEmail] = useState('');
+    const [userEmail, setUserEmail] = useState<string | null>(localStorage.getItem('userEmail'));
+    const [userId] = useState<string | null>(localStorage.getItem('userId'));
 
     // 新書表單狀態
     const [newBook, setNewBook] = useState({
@@ -39,8 +42,9 @@ const ShelfPage: React.FC<ShelfPageProps> = ({ status }) => {
     const fetchBooks = async () => {
         setLoading(true);
         try {
-            const response = await axios.get(GAS_URL);
-            const raw = response.data.data || response.data;
+            const userId = localStorage.getItem('userId') || 'guest';
+            const resData = await AuthService.getBooks(userId);
+            const raw = resData.data || [];
             const normalized = Array.isArray(raw) ? raw.map((item: any) => ({
                 id: item.Book_ID || item.id || String(Math.random()),
                 title: item.Title || item.title || '',
@@ -70,8 +74,7 @@ const ShelfPage: React.FC<ShelfPageProps> = ({ status }) => {
         const bookId = `B-${Date.now()}`;
 
         try {
-            await axios.post(GAS_URL, JSON.stringify({
-                action: 'addBook',
+            const res = await AuthService.addBook({
                 Book_ID: bookId,
                 User_ID: userId,
                 Title: newBook.title,
@@ -81,13 +84,16 @@ const ShelfPage: React.FC<ShelfPageProps> = ({ status }) => {
                 Status: status,
                 Chat_History: '[]',
                 Mind_Map_Data: '{}'
-            }), {
-                headers: { 'Content-Type': 'text/plain' }
             });
 
-            await fetchBooks();
-            setIsAddModalOpen(false);
-            setNewBook({ title: '', author: '', category: '自學', cover: '' });
+            if (res.success) {
+                await fetchBooks();
+                setIsAddModalOpen(false);
+                setNewBook({ title: '', author: '', category: '自學', cover: '' });
+                alert('書籍已成功加入！');
+            } else {
+                alert(`儲存失敗：${res.message || res.error || '後端回傳錯誤'}`);
+            }
         } catch (err) {
             console.error('Add book error:', err);
             alert('新增書籍失敗，請檢查網路或 GAS 設定');
@@ -126,14 +132,62 @@ const ShelfPage: React.FC<ShelfPageProps> = ({ status }) => {
                 <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
                     {status === '想閱讀' ? '待讀清單' : '知識寶庫'}
                 </h1>
-                <button
-                    onClick={() => setIsAddModalOpen(true)}
-                    className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3.5 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-bold transition-all shadow-lg shadow-blue-600/20 active:scale-95 group min-h-[48px]"
-                >
-                    <Plus className="w-5 h-5 transition-transform group-hover:rotate-90" />
-                    新增書籍
-                </button>
+                <div className="flex items-center gap-3 w-full sm:w-auto">
+                    {userId && !userEmail && (
+                        <button
+                            onClick={() => setIsBindModalOpen(true)}
+                            className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3.5 bg-slate-800 hover:bg-slate-700 text-blue-400 border border-blue-500/20 rounded-2xl font-bold transition-all min-h-[48px]"
+                        >
+                            <Mail className="w-5 h-5" />
+                            綁定 Email
+                        </button>
+                    )}
+                    <button
+                        onClick={() => setIsAddModalOpen(true)}
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3.5 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-bold transition-all shadow-lg shadow-blue-600/20 active:scale-95 group min-h-[48px]"
+                    >
+                        <Plus className="w-5 h-5 transition-transform group-hover:rotate-90" />
+                        新增書籍
+                    </button>
+                </div>
             </div>
+
+            {/* 綁定 Email 彈窗 */}
+            {isBindModalOpen && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setIsBindModalOpen(false)} />
+                    <div className="relative w-full max-w-sm bg-[#1e293b] border border-white/10 rounded-3xl shadow-2xl p-8 animate-in fade-in zoom-in duration-300">
+                        <h2 className="text-xl font-bold text-white mb-2">綁定電子信箱</h2>
+                        <p className="text-slate-400 text-sm mb-6">備份您的閱讀紀錄，防止更換裝置時資料遺失。</p>
+                        <div className="space-y-4">
+                            <input
+                                type="email"
+                                value={bindEmail}
+                                onChange={e => setBindEmail(e.target.value)}
+                                placeholder="例如: user@example.com"
+                                className="w-full bg-slate-900/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                            />
+                            <button
+                                onClick={async () => {
+                                    if (!bindEmail || !userId) return;
+                                    const res = await AuthService.bindEmail(userId, bindEmail);
+                                    if (res.success) {
+                                        localStorage.setItem('userEmail', bindEmail);
+                                        setUserEmail(bindEmail);
+                                        setIsBindModalOpen(false);
+                                        alert('綁定成功！');
+                                    } else {
+                                        alert(res.message);
+                                    }
+                                }}
+                                className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl transition-all"
+                            >
+                                確認綁定
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <div className="flex flex-col gap-6">
                 <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar -mx-2 px-2 sm:mx-0 sm:px-0">
