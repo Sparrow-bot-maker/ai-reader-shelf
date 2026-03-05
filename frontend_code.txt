@@ -1,0 +1,1549 @@
+﻿
+
+=== src\components\BookCard.tsx ===
+
+import React from 'react';
+import { Tag, BookOpen } from 'lucide-react';
+
+interface BookCardProps {
+    book: {
+        id: string;
+        title: string;
+        author: string;
+        cover: string;
+        category: string;
+    };
+    onClick?: () => void;
+}
+
+const BookCard: React.FC<BookCardProps> = ({ book, onClick }) => {
+    return (
+        <div
+            onClick={onClick}
+            className="group relative bg-white/5 backdrop-blur-lg border border-white/10 rounded-2xl overflow-hidden cursor-pointer transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl hover:shadow-blue-500/10 flex flex-col h-full"
+        >
+            <div className="aspect-[3/4] overflow-hidden relative bg-slate-800">
+                <img
+                    src={book.cover || `https://placehold.co/300x400/1e293b/3b82f6?text=${encodeURIComponent(book.title)}`}
+                    alt={book.title}
+                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                    onError={(e) => {
+                        (e.target as HTMLImageElement).src = `https://placehold.co/300x400/1e293b/3b82f6?text=${encodeURIComponent(book.title)}`;
+                    }}
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-900/90 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex items-end p-4">
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation(); // 避免觸發兩次
+                            onClick?.();
+                        }}
+                        className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-lg flex items-center justify-center gap-2 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-500"
+                    >
+                        <BookOpen className="w-4 h-4" />
+                        查看詳情
+                    </button>
+                </div>
+            </div>
+
+            <div className="p-4 space-y-2 flex-grow">
+                <div className="flex items-center gap-2">
+                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 text-[10px] font-bold uppercase tracking-wider">
+                        <Tag className="w-3 h-3" />
+                        {book.category}
+                    </span>
+                </div>
+                <h3 className="text-lg font-bold text-white line-clamp-2 group-hover:text-blue-400 transition-colors">
+                    {book.title}
+                </h3>
+                <p className="text-sm text-slate-400">
+                    {book.author}
+                </p>
+            </div>
+        </div>
+    );
+};
+
+export default BookCard;
+
+
+
+=== src\components\BookModal.tsx ===
+
+import { useState, useRef, useEffect } from 'react';
+import { X, Send, Sparkles, Network, Loader2, Save, Trash2, RefreshCcw } from 'lucide-react';
+import { ReactFlow, Background, Controls } from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
+import axios from 'axios';
+import { AuthService } from '../services/AuthService';
+
+interface Book {
+    id: string;
+    title: string;
+    author: string;
+    cover: string;
+    category: string;
+    status: '想閱讀' | '已閱讀';
+}
+
+interface Message {
+    role: 'user' | 'assistant';
+    content: string;
+}
+
+interface BookModalProps {
+    book: Book;
+    onClose: () => void;
+}
+
+// const GEMINI_URL = ... (Moved into handleSend for better debugging)
+const NODE_COLORS = ['#3b82f6', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'];
+
+const BookModal = ({ book, onClose }: BookModalProps) => {
+    const [messages, setMessages] = useState<Message[]>([
+        { role: 'assistant', content: `你好！我是你的 AI 讀書助理。關於《${book.title}》，你想深入了解哪些內容呢？討論過程中，我會幫你把重點整理成右側思維導圖。` }
+    ]);
+    const [input, setInput] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    const [activeTab, setActiveTab] = useState<'chat' | 'map'>('chat');
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+    const nodeCountRef = useRef(0);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const [nodes, setNodes] = useState<any[]>([
+        {
+            id: 'root',
+            position: { x: 300, y: 10 },
+            data: { label: book.title },
+            style: {
+                background: 'linear-gradient(135deg, #3b82f6, #6366f1)',
+                color: '#fff',
+                borderRadius: '16px',
+                padding: '12px 20px',
+                fontWeight: 'bold',
+                fontSize: '14px',
+                border: 'none',
+                boxShadow: '0 0 20px rgba(59,130,246,0.5)',
+                minWidth: 160,
+                textAlign: 'center' as const,
+            },
+        },
+    ]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const [edges, setEdges] = useState<any[]>([]);
+
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [messages, isLoading]);
+
+    // 讀取歷史紀錄
+    useEffect(() => {
+        const fetchHistory = async () => {
+            try {
+                const userId = localStorage.getItem('userId') || 'guest';
+                const resData = await AuthService.getBooks(userId);
+                const allBooks = resData.data || [];
+                const currentBook = allBooks.find((b: any) => b.Book_ID === book.id || (b.Title === book.title && b.User_ID === userId));
+
+                if (currentBook) {
+                    if (currentBook.Chat_History && currentBook.Chat_History !== '[]') {
+                        setMessages(JSON.parse(currentBook.Chat_History));
+                    }
+                    if (currentBook.Mind_Map_Data && currentBook.Mind_Map_Data !== '{}') {
+                        const savedMap = JSON.parse(currentBook.Mind_Map_Data);
+                        setNodes(savedMap.nodes);
+                        setEdges(savedMap.edges);
+
+                        // 更新節點計數器
+                        const maxId = savedMap.nodes.reduce((max: number, node: any) => {
+                            const idMatch = node.id.match(/node-(\d+)/);
+                            return idMatch ? Math.max(max, parseInt(idMatch[1])) : max;
+                        }, 0);
+                        nodeCountRef.current = maxId;
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to restore history:', err);
+            }
+        };
+        fetchHistory();
+    }, [book.id]);
+
+    const addKeywordNodes = (keywords: string[]) => {
+        if (!keywords.length) return;
+
+        // 計算新節點的佈局：以 root 為基準對稱展開
+        const rootNode = nodes.find(n => n.id === 'root');
+        const parentPos = rootNode ? rootNode.position : { x: 300, y: 10 };
+
+        const spacingX = 200; // 節點間距
+        const spacingY = 150; // 層級間距
+
+        const newNodes = keywords.map((kw, i) => {
+            nodeCountRef.current += 1;
+            const nId = `node-${nodeCountRef.current}`;
+            const color = NODE_COLORS[nodeCountRef.current % NODE_COLORS.length];
+
+            // 計算對稱偏移：
+            // 例如 3 個節點，偏移 index 分別為 -1, 0, 1
+            const offsetIndex = i - (keywords.length - 1) / 2;
+            const targetX = parentPos.x + (offsetIndex * spacingX);
+            const targetY = parentPos.y + spacingY;
+
+            return {
+                id: nId,
+                position: {
+                    x: targetX,
+                    y: targetY
+                },
+                data: { label: kw },
+                style: {
+                    background: `${color}22`,
+                    color: '#e2e8f0',
+                    border: `1.5px solid ${color}88`,
+                    borderRadius: '12px',
+                    padding: '10px 16px',
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    minWidth: 120,
+                    textAlign: 'center' as const,
+                    boxShadow: `0 8px 15px ${color}20`,
+                },
+            };
+        });
+
+        const newEdges = newNodes.map((n) => ({
+            id: `e-root-${n.id}`,
+            source: 'root',
+            target: n.id,
+            animated: true,
+            style: { stroke: NODE_COLORS[parseInt(n.id.split('-')[1]) % NODE_COLORS.length], strokeWidth: 2, opacity: 0.6 },
+        }));
+
+        setNodes((prev: any[]) => [...prev, ...newNodes]);
+        setEdges((prev: any[]) => [...prev, ...newEdges]);
+
+        // 手機端自動跳轉到導圖
+        if (window.innerWidth < 768) {
+            setActiveTab('map');
+        }
+    };
+
+    const handleSend = async () => {
+        if (!input.trim() || isLoading) return;
+
+        const userMsg: Message = { role: 'user', content: input };
+        const currentInput = input;
+        setInput('');
+        setMessages((prev) => [...prev, userMsg]);
+        setIsLoading(true);
+
+        try {
+            const GAS_URL = import.meta.env.VITE_GAS_URL;
+            if (!GAS_URL) throw new Error('找不到 GAS_URL 設定，請確認環境變數。');
+
+            const systemPrompt = `你是一個專業的讀書助理，正在幫使用者討論《${book.title}》（作者：${book.author}，分類：${book.category}）。請以 JSON 格式回覆，包含：1. "text": 對話回覆（繁體中文，自然有深度） 2. "keywords": 從回覆提取 2-4 個核心概念（繁體中文詞語陣列）。只回傳 JSON，不要有其他文字。`;
+
+            let fullPrompt = systemPrompt + '\n\n';
+            if (messages.length > 1) {
+                fullPrompt += '[歷史對話]\n';
+                messages.slice(1).forEach(m => {
+                    fullPrompt += `${m.role === 'assistant' ? 'AI' : '用戶'}: ${m.content}\n`;
+                });
+                fullPrompt += '\n';
+            }
+            fullPrompt += `用戶: ${currentInput}\n請回答:`;
+
+            const res = await axios.post(GAS_URL, JSON.stringify({
+                action: 'chat',
+                prompt: fullPrompt
+            }), {
+                headers: {
+                    "Content-Type": "text/plain;charset=utf-8",
+                }
+            });
+
+            const rawText: string = res.data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+            const cleaned = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+
+            let parsed: { text: string; keywords: string[] } = { text: rawText, keywords: [] };
+            try { parsed = JSON.parse(cleaned); } catch { parsed = { text: cleaned, keywords: [] }; }
+
+            setMessages((prev) => [...prev, { role: 'assistant', content: parsed.text }]);
+            if (parsed.keywords?.length) addKeywordNodes(parsed.keywords);
+
+        } catch (err: unknown) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const detail = (err as any)?.response?.data?.error?.message || (err as any)?.message || String(err);
+            console.error('Gemini API error:', detail, err);
+
+            let displayMsg = `⚠️ API 錯誤：${detail}`;
+            if (detail.includes('429') || detail.toLowerCase().includes('quota')) {
+                displayMsg = "親愛的，我今天的腦力稍微透支了，需要休息一下下喔！明天我會帶著滿滿的活力回來繼續陪你讀書，請明天再來找我吧！❤️";
+            }
+
+            setMessages((prev) => [...prev, {
+                role: 'assistant',
+                content: displayMsg,
+            }]);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleSave = async () => {
+        setIsSaving(true);
+        try {
+            const userId = localStorage.getItem('userId') || 'guest';
+            await AuthService.updateBook({
+                Book_ID: book.id,
+                Title: book.title,
+                User_ID: userId,
+                Chat_History: JSON.stringify(messages),
+                Mind_Map_Data: JSON.stringify({ nodes, edges }),
+            });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleDelete = async () => {
+        if (!window.confirm('你確定要狠心刪除這本書嗎？這將無法復原喔！')) return;
+
+        try {
+            await AuthService.deleteBook(book.id);
+            onClose();
+            window.location.reload(); // 簡單起見，直接刷新頁面
+        } catch (err) {
+            console.error('Delete error:', err);
+            alert('刪除失敗');
+        }
+    };
+
+    const handleToggleStatus = async () => {
+        const newStatus = book.status === '想閱讀' ? '已閱讀' : '想閱讀';
+        try {
+            await AuthService.updateBook({
+                Book_ID: book.id,
+                Status: newStatus,
+                Title: book.title,
+                User_ID: localStorage.getItem('userId') || 'guest'
+            });
+            onClose();
+            window.location.reload();
+        } catch (err) {
+            console.error('Toggle status error:', err);
+        }
+    };
+
+    const handleClose = () => {
+        handleSave();
+        onClose();
+    };
+
+    return (
+        <div className="fixed inset-0 z-[100] flex items-stretch justify-end overflow-hidden">
+            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={handleClose} />
+
+            <div className="relative w-full max-w-[95%] lg:max-w-[1200px] h-full bg-[#0f172a] border-l border-white/10 shadow-2xl flex flex-col overflow-hidden animate-slide-in-right">
+
+                {/* Header */}
+                <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 bg-white/5 border-b border-white/10 shrink-0">
+                    <div className="flex items-center gap-2 sm:gap-4 overflow-hidden">
+                        <img
+                            src={book.cover || `https://placehold.co/40x40/1e293b/3b82f6?text=📚`}
+                            className="w-8 h-8 sm:w-10 sm:h-10 object-cover rounded-md shadow-lg shrink-0"
+                            alt=""
+                        />
+                        <div className="overflow-hidden">
+                            <h2 className="text-sm sm:text-xl font-bold text-white leading-tight truncate">{book.title}</h2>
+                            <p className="text-[10px] sm:text-xs text-slate-400 mt-0.5 truncate">{book.author}</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-1 sm:gap-2">
+                        <button
+                            onClick={handleToggleStatus}
+                            className="flex items-center gap-2 px-2.5 sm:px-3 py-2 sm:py-2.5 bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 border border-blue-500/20 rounded-lg text-[10px] sm:text-xs font-medium transition-all min-h-[44px]"
+                            title={`標記為${book.status === '想閱讀' ? '已閱讀' : '想閱讀'}`}
+                        >
+                            <RefreshCcw className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">標記為{book.status === '想閱讀' ? '已閱讀' : '想閱讀'}</span>
+                        </button>
+                        <button
+                            onClick={handleDelete}
+                            className="p-2.5 sm:p-2 hover:bg-red-500/10 rounded-full transition-colors text-slate-400 hover:text-red-400 min-w-[44px] min-h-[44px] flex items-center justify-center"
+                            title="刪除"
+                        >
+                            <Trash2 className="w-5 h-5" />
+                        </button>
+                        <div className="w-px h-6 bg-white/10 mx-0.5 sm:mx-1" />
+                        <button
+                            onClick={handleSave}
+                            disabled={isSaving}
+                            className="flex items-center gap-2 px-2.5 sm:px-3 py-2 sm:py-2.5 bg-green-600/20 hover:bg-green-600/40 text-green-400 border border-green-500/20 rounded-lg text-[10px] sm:text-xs font-medium transition-all disabled:opacity-50 min-h-[44px]"
+                            title="儲存進度"
+                        >
+                            {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                            <span className="hidden sm:inline">儲存進度</span>
+                        </button>
+                        <button
+                            onClick={handleClose}
+                            className="p-2 sm:p-2 hover:bg-white/10 rounded-full transition-colors text-slate-400 hover:text-white min-w-[44px] min-h-[44px] flex items-center justify-center"
+                            aria-label="Close"
+                        >
+                            <X className="w-6 h-6" />
+                        </button>
+                    </div>
+                </div>
+
+                {/* Mobile Tab Switcher */}
+                <div className="flex md:hidden bg-white/5 border-b border-white/10 p-1 shrink-0">
+                    <button
+                        onClick={() => setActiveTab('chat')}
+                        className={`flex-1 py-3 text-xs font-bold rounded-xl transition-all ${activeTab === 'chat' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400'}`}
+                    >
+                        AI 對話
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('map')}
+                        className={`flex-1 py-3 text-xs font-bold rounded-xl transition-all ${activeTab === 'map' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400'}`}
+                    >
+                        思維導圖
+                    </button>
+                </div>
+
+                {/* Main Content */}
+                <div className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
+
+                    {/* Chat Section */}
+                    <div className={`
+                        flex-col border-r border-white/10 bg-black/20 shrink-0 w-full md:w-[400px] lg:w-[450px]
+                        ${activeTab === 'chat' ? 'flex' : 'hidden md:flex'}
+                    `}>
+                        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+                            {messages.map((m, i) => (
+                                <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                    <div className={`max-w-[85%] p-4 rounded-2xl text-sm leading-relaxed ${m.role === 'user'
+                                        ? 'bg-blue-600 text-white rounded-tr-none'
+                                        : 'bg-white/5 text-slate-200 border border-white/10 rounded-tl-none'
+                                        }`}>
+                                        {m.content}
+                                    </div>
+                                </div>
+                            ))}
+                            {isLoading && (
+                                <div className="flex justify-start">
+                                    <div className="bg-white/5 border border-white/10 rounded-2xl rounded-tl-none p-4 flex items-center gap-2">
+                                        <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />
+                                        <span className="text-slate-400 text-sm">AI 思考中...</span>
+                                    </div>
+                                </div>
+                            )}
+                            <div ref={messagesEndRef} />
+                        </div>
+
+                        {/* Chat Input - Sticky/Fixed at bottom of section */}
+                        <div className="p-4 bg-white/5 border-t border-white/10 mt-auto">
+                            <div className="relative">
+                                <textarea
+                                    value={input}
+                                    onChange={(e) => setInput(e.target.value)}
+                                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+                                    placeholder="詢問 AI 關於這本書... (Enter 發送)"
+                                    rows={2}
+                                    className="w-full bg-slate-800/50 border border-white/10 rounded-xl py-3 pl-4 pr-12 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none text-sm"
+                                />
+                                <button
+                                    onClick={handleSend}
+                                    disabled={isLoading || !input.trim()}
+                                    className="absolute right-2 bottom-2 p-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white rounded-lg transition-colors shadow-lg"
+                                >
+                                    <Send className="w-4 h-4" />
+                                </button>
+                            </div>
+                            <p className="text-[10px] text-slate-500 mt-2 text-center flex items-center justify-center gap-1">
+                                <Sparkles className="w-3 h-3 text-blue-400" />
+                                AI 回覆後自動提取關鍵字並跳轉至導圖
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Mind Map Section */}
+                    <div className={`
+                        flex-1 relative bg-[#0a0f1d] overflow-hidden
+                        ${activeTab === 'map' ? 'flex' : 'hidden md:flex'}
+                    `}>
+                        <div className="absolute top-3 left-3 sm:top-4 sm:left-4 z-10 flex flex-col gap-2">
+                            <span className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/10 text-blue-400 rounded-full text-[10px] sm:text-xs font-bold border border-blue-500/20 backdrop-blur-md">
+                                <Network className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                                AI 思維導圖 · {nodes.length - 1} 個概念
+                            </span>
+
+                            {/* Back to Chat Button (Mobile) */}
+                            <button
+                                onClick={() => setActiveTab('chat')}
+                                className="md:hidden flex items-center gap-2 px-3 py-2 bg-slate-800/80 hover:bg-slate-700 text-white rounded-xl text-[10px] font-bold border border-white/10 backdrop-blur-md shadow-xl transition-all active:scale-95"
+                            >
+                                <RefreshCcw className="w-3.5 h-3.5" />
+                                返回聊天對話
+                            </button>
+                        </div>
+
+                        <div className="w-full h-full">
+                            <ReactFlow
+                                nodes={nodes}
+                                edges={edges}
+                                colorMode="dark"
+                                fitView
+                                proOptions={{ hideAttribution: true }}
+                            >
+                                <Background color="#1e293b" gap={24} />
+                                <Controls className="!bg-slate-800/80 !border-white/10 sm:flex hidden" />
+                            </ReactFlow>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default BookModal;
+
+
+
+=== src\components\Navbar.tsx ===
+
+import { Link, useLocation } from 'react-router-dom';
+import { Library, BookCheck, Sparkles, User, LogOut } from 'lucide-react';
+import UserLoginModal from './UserLoginModal';
+import { useState, useEffect } from 'react';
+
+const Navbar = () => {
+    const location = useLocation();
+
+    const navItems = [
+        { path: '/want-to-read', label: '想閱讀', icon: Library },
+        { path: '/already-read', label: '已閱讀', icon: BookCheck },
+    ];
+
+    const [isLoginOpen, setIsLoginOpen] = useState(false);
+    const [userId, setUserId] = useState<string | null>(localStorage.getItem('userId'));
+
+    useEffect(() => {
+        // 如果未登入且不在登入頁面，才自動開啟彈窗
+        if (!userId && location.pathname !== '/login') {
+            setIsLoginOpen(true);
+        }
+    }, [userId, location.pathname]);
+
+    const handleLogin = (id: string) => {
+        setUserId(id);
+    };
+
+    const handleLogout = () => {
+        localStorage.removeItem('userId');
+        setUserId(null);
+        setIsLoginOpen(true);
+    };
+
+    return (
+        <nav className="fixed top-0 left-0 right-0 z-50 glass-nav border-b border-white/5">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 sm:h-20 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                    <div className="p-1.5 sm:p-2 bg-blue-500/20 rounded-lg hidden sm:block">
+                        <Sparkles className="w-5 h-5 sm:w-6 sm:h-6 text-blue-400" />
+                    </div>
+                    <span className="text-lg sm:text-xl font-bold tracking-tight text-white whitespace-nowrap">
+                        AI Reader<span className="text-blue-500">Shelf</span>
+                    </span>
+                </div>
+
+                <div className="flex items-center gap-3 sm:gap-8 overflow-x-auto no-scrollbar">
+                    {navItems.map((item) => (
+                        <Link
+                            key={item.path}
+                            to={item.path}
+                            className={`flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-medium transition-all duration-300 hover:text-blue-400 min-h-[44px] px-1 ${location.pathname === item.path ? 'text-blue-400' : 'text-slate-400'
+                                }`}
+                        >
+                            <item.icon className="w-4 h-4 shrink-0" />
+                            <span className="whitespace-nowrap">{item.label}</span>
+                            {location.pathname === item.path && (
+                                <div className="absolute -bottom-1 left-0 right-0 h-0.5 bg-blue-500 shadow-[0_0_12px_rgba(59,130,246,0.5)]" />
+                            )}
+                        </Link>
+                    ))}
+                </div>
+
+                <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+                    <div className="hidden md:flex items-center gap-3 px-3 py-1.5 bg-white/5 rounded-full border border-white/10 text-[10px] text-slate-400">
+                        <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                        ID: <span className="text-slate-200 font-mono">{userId ? (userId.length > 8 ? `${userId.substring(0, 5)}...` : userId) : 'NONE'}</span>
+                    </div>
+
+                    <button
+                        onClick={() => setIsLoginOpen(true)}
+                        className="p-2 sm:p-3 rounded-full hover:bg-white/5 transition-colors text-slate-400 hover:text-blue-400 relative group min-w-[44px] min-h-[44px] flex items-center justify-center"
+                        aria-label="User profile"
+                    >
+                        <User className="w-5 h-5" />
+                        <span className="absolute bottom-2 right-2 w-2 h-2 bg-blue-500 border-2 border-[#0f172a] rounded-full" />
+                    </button>
+
+                    {userId && (
+                        <button
+                            onClick={handleLogout}
+                            className="p-2 sm:p-3 rounded-full hover:bg-red-500/10 transition-colors text-slate-500 hover:text-red-400 min-w-[44px] min-h-[44px] flex items-center justify-center"
+                            aria-label="Logout"
+                        >
+                            <LogOut className="w-4 h-4" />
+                        </button>
+                    )}
+                </div>
+            </div>
+
+            <UserLoginModal
+                isOpen={isLoginOpen}
+                onClose={() => setIsLoginOpen(false)}
+                onLogin={handleLogin}
+            />
+        </nav>
+    );
+};
+
+export default Navbar;
+
+
+
+=== src\components\UserLoginModal.tsx ===
+
+import { X, LogIn, User } from 'lucide-react';
+import { GoogleLogin } from '@react-oauth/google';
+import { jwtDecode } from 'jwt-decode';
+import { AuthService } from '../services/AuthService';
+
+interface UserLoginModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    onLogin: (userId: string) => void;
+}
+
+const UserLoginModal = ({ isOpen, onClose, onLogin }: UserLoginModalProps) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const handleGoogleSuccess = (credentialResponse: any) => {
+        const decoded: any = jwtDecode(credentialResponse.credential);
+        const googleId = decoded.email;
+
+        AuthService.saveSession(googleId, googleId);
+        onLogin(googleId);
+        onClose();
+        window.location.reload(); // 重新整理以確保 ShelfPage 重新抓取資料
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-md" onClick={onClose} />
+
+            <div className="relative w-full max-w-md bg-[#1e293b] border border-white/10 rounded-3xl shadow-2xl p-8 animate-in fade-in zoom-in duration-300">
+                <button
+                    onClick={onClose}
+                    className="absolute top-4 right-4 p-2 hover:bg-white/5 rounded-full text-slate-400 hover:text-white transition-colors"
+                >
+                    <X className="w-5 h-5" />
+                </button>
+
+                <div className="flex flex-col items-center text-center mb-8">
+                    <div className="w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center mb-4 border border-blue-500/30">
+                        <User className="w-8 h-8 text-blue-400" />
+                    </div>
+                    <h2 className="text-2xl font-bold text-white mb-2">登入以同步書架</h2>
+                    <p className="text-slate-400 text-sm">請自定義 ID 登入或使用 Google 帳戶</p>
+                </div>
+
+                <div className="space-y-6">
+                    <div className="flex justify-center">
+                        <GoogleLogin
+                            onSuccess={handleGoogleSuccess}
+                            onError={() => console.log('Login Failed')}
+                            useOneTap
+                            theme="filled_blue"
+                            shape="pill"
+                            width="320"
+                        />
+                    </div>
+
+                    <div className="relative flex items-center py-2">
+                        <div className="flex-grow border-t border-white/10"></div>
+                        <span className="flex-shrink mx-4 text-slate-500 text-xs uppercase tracking-widest font-bold">或使用 ID 帳密登入</span>
+                        <div className="flex-grow border-t border-white/10"></div>
+                    </div>
+
+                    <div className="flex justify-center">
+                        <button
+                            onClick={() => {
+                                onClose();
+                                // 導航至新的登入頁面
+                                const baseUrl = window.location.pathname.includes('/ai-reader-shelf') ? '/ai-reader-shelf/login' : '/login';
+                                window.location.pathname = baseUrl;
+                            }}
+                            className="w-full bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 border border-blue-500/20 font-bold py-4 rounded-2xl flex items-center justify-center gap-2 transition-all group"
+                        >
+                            <LogIn className="w-5 h-5 transition-transform group-hover:translate-x-1" />
+                            帳號密碼登入 / 註冊
+                        </button>
+                    </div>
+                </div>
+
+                <p className="mt-8 text-center text-[10px] text-slate-500 leading-relaxed">
+                    為了您的資安，現在我們改用密碼登入方式。<br />
+                    首次使用的 ID 請點擊按鈕後進行「註冊」。
+                </p>
+            </div>
+        </div>
+    );
+};
+
+export default UserLoginModal;
+
+
+
+=== src\pages\LoginPage.tsx ===
+
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { User, Lock, Mail, ChevronRight, AlertCircle, RefreshCcw } from 'lucide-react';
+import { AuthService } from '../services/AuthService';
+
+const LoginPage = () => {
+    const navigate = useNavigate();
+    const [mode, setMode] = useState<'login' | 'signup' | 'forgot'>('login');
+    const [loading, setLoading] = useState(false);
+    const [sendLoading, setSendLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    // Form states
+    const [userId, setUserId] = useState('');
+    const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [email, setEmail] = useState('');
+    const [code, setCode] = useState('');
+
+    const toggleMode = () => {
+        setMode(prev => prev === 'login' ? 'signup' : 'login');
+        setError(null);
+    };
+
+    const handleSendCode = async () => {
+        if (!email) {
+            setError('請先輸入 Email');
+            return;
+        }
+        setSendLoading(true);
+        setError(null);
+        try {
+            const res = await AuthService.sendCode(email);
+            if (res.success) {
+                setError('✅ 驗證碼已發送至您的信箱');
+            } else {
+                setError(res.message || '發送失敗');
+            }
+        } catch (err) {
+            setError('發送失敗，請檢查網路');
+        } finally {
+            setSendLoading(false);
+        }
+    };
+
+    const handleAction = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError(null);
+        setLoading(true);
+
+        try {
+            if (mode === 'login') {
+                const passHash = await AuthService.hashPassword(password);
+                const res = await AuthService.login(userId, passHash);
+                if (res.success) {
+                    AuthService.saveSession(res.userId!, res.email);
+                    navigate('/want-to-read');
+                } else {
+                    setError(res.message || '登入失敗');
+                }
+            } else if (mode === 'signup') {
+                if (password !== confirmPassword) {
+                    setError('兩次輸入的密碼不一致');
+                    setLoading(false);
+                    return;
+                }
+                const passHash = await AuthService.hashPassword(password);
+                const res = await AuthService.signUp(userId, passHash, email);
+                if (res.success) {
+                    setMode('login');
+                    setError('註冊成功，請登入');
+                } else {
+                    setError(res.message || '註冊失敗');
+                }
+            } else if (mode === 'forgot') {
+                if (!code) {
+                    // 第一步：發送驗證碼
+                    const res = await AuthService.sendCode(email);
+                    if (res.success) {
+                        setError('驗證碼已發送');
+                    } else {
+                        setError(res.message || '發送失敗');
+                    }
+                } else {
+                    // 第二步：重設密碼
+                    const passHash = await AuthService.hashPassword(password);
+                    const res = await AuthService.resetPassword(email, code, passHash);
+                    if (res.success) {
+                        setMode('login');
+                        setError('密碼已重設，請登入');
+                    } else {
+                        setError(res.message || '重設失敗');
+                    }
+                }
+            }
+        } catch (err) {
+            setError('系統錯誤，請稍後再試');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="min-h-[80vh] flex items-center justify-center p-4">
+            <div className="w-full max-w-md glass-card p-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="text-center mb-8">
+                    <h1 className="text-3xl font-bold text-white mb-2">
+                        {mode === 'login' ? '歡迎回來' : mode === 'signup' ? '建立帳號' : '找回密碼'}
+                    </h1>
+                    <p className="text-slate-400 text-sm">
+                        {mode === 'login' ? '登入以同步您的閱讀進度' : mode === 'signup' ? '加入 AI Reader Shelf 開始導讀之旅' : '請輸入註冊時綁定的 Email'}
+                    </p>
+                </div>
+
+                {error && (
+                    <div className={`mb-6 p-4 rounded-2xl flex items-center gap-3 text-sm animate-in fade-in direction-alternate ${error.includes('成功') ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}`}>
+                        <AlertCircle className="w-5 h-5 shrink-0" />
+                        {error}
+                    </div>
+                )}
+
+                <form onSubmit={handleAction} className="space-y-4">
+                    {mode !== 'forgot' && (
+                        <div className="relative">
+                            <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                            <input
+                                type="text"
+                                placeholder="使用者 ID"
+                                value={userId}
+                                onChange={e => setUserId(e.target.value)}
+                                className="w-full bg-slate-900/50 border border-white/10 rounded-2xl pl-12 pr-4 py-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                                required
+                            />
+                        </div>
+                    )}
+
+                    {(mode === 'signup' || mode === 'forgot') && (
+                        <div className="relative group">
+                            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                            <input
+                                type="email"
+                                placeholder="Email (可選，用於找回密碼)"
+                                value={email}
+                                onChange={e => setEmail(e.target.value)}
+                                className="w-full bg-slate-900/50 border border-white/10 rounded-2xl pl-12 pr-24 py-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                                required={mode === 'forgot'}
+                            />
+                            {mode === 'forgot' && (
+                                <button
+                                    type="button"
+                                    onClick={handleSendCode}
+                                    disabled={sendLoading}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all"
+                                >
+                                    {sendLoading ? '發送中' : '發送'}
+                                </button>
+                            )}
+                        </div>
+                    )}
+
+                    {mode === 'forgot' && (
+                        <div className="relative">
+                            <RefreshCcw className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                            <input
+                                type="text"
+                                placeholder="驗證碼 (收信後輸入)"
+                                value={code}
+                                onChange={e => setCode(e.target.value)}
+                                className="w-full bg-slate-900/50 border border-white/10 rounded-2xl pl-12 pr-4 py-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                            />
+                        </div>
+                    )}
+
+                    <div className="relative">
+                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                        <input
+                            type="password"
+                            placeholder={mode === 'forgot' ? '新密碼' : '密碼'}
+                            value={password}
+                            onChange={e => setPassword(e.target.value)}
+                            className="w-full bg-slate-900/50 border border-white/10 rounded-2xl pl-12 pr-4 py-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                            required
+                        />
+                    </div>
+
+                    {mode === 'signup' && (
+                        <div className="relative">
+                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                            <input
+                                type="password"
+                                placeholder="確認密碼"
+                                value={confirmPassword}
+                                onChange={e => setConfirmPassword(e.target.value)}
+                                className="w-full bg-slate-900/50 border border-white/10 rounded-2xl pl-12 pr-4 py-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                                required
+                            />
+                        </div>
+                    )}
+
+                    {mode === 'signup' && (
+                        <p className="text-[10px] text-rose-400 font-medium px-2">
+                            提醒：若不綁定 Email，忘記密碼將永久失去閱讀紀錄。
+                        </p>
+                    )}
+
+                    <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 transition-all group mt-2"
+                    >
+                        {loading ? '處理中...' : mode === 'login' ? '登入' : mode === 'signup' ? '立即註冊' : '確認重設'}
+                        <ChevronRight className={`w-5 h-5 transition-transform ${loading ? '' : 'group-hover:translate-x-1'}`} />
+                    </button>
+                </form>
+
+                <div className="mt-8 flex flex-col gap-4 items-center">
+                    <button
+                        onClick={toggleMode}
+                        className="text-slate-400 hover:text-white text-sm font-medium transition-colors"
+                    >
+                        {mode === 'login' ? '還沒有帳號？ 按此註冊' : '已有帳號？ 返回登入'}
+                    </button>
+                    {mode === 'login' && (
+                        <button
+                            onClick={() => setMode('forgot')}
+                            className="text-blue-400/80 hover:text-blue-400 text-xs transition-colors"
+                        >
+                            忘記密碼？
+                        </button>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default LoginPage;
+
+
+
+=== src\pages\ShelfPage.tsx ===
+
+import React, { useState, useEffect } from 'react';
+import BookCard from '../components/BookCard';
+import BookModal from '../components/BookModal';
+import { Loader2, Plus, Save, X, Mail } from 'lucide-react';
+import { AuthService } from '../services/AuthService';
+
+interface Book {
+    id: string;
+    title: string;
+    author: string;
+    cover: string;
+    category: string;
+    status: '想閱讀' | '已閱讀';
+}
+
+interface ShelfPageProps {
+    status: '想閱讀' | '已閱讀';
+}
+
+
+const ShelfPage: React.FC<ShelfPageProps> = ({ status }) => {
+    const [books, setBooks] = useState<Book[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+    const [selectedBook, setSelectedBook] = useState<Book | null>(null);
+    const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isBindModalOpen, setIsBindModalOpen] = useState(false);
+    const [bindEmail, setBindEmail] = useState('');
+    const [userEmail, setUserEmail] = useState<string | null>(localStorage.getItem('userEmail'));
+    const [userId] = useState<string | null>(localStorage.getItem('userId'));
+
+    // 新書表單狀態
+    const [newBook, setNewBook] = useState({
+        title: '',
+        author: '',
+        category: '自學',
+        cover: '',
+    });
+
+    const fetchBooks = async () => {
+        setLoading(true);
+        try {
+            const userId = localStorage.getItem('userId') || 'guest';
+            const resData = await AuthService.getBooks(userId);
+            const raw = resData.data || [];
+            const normalized = Array.isArray(raw) ? raw.map((item: any) => ({
+                id: item.Book_ID || item.id || String(Math.random()),
+                title: item.Title || item.title || '',
+                author: item.Author || item.author || '',
+                cover: item.Cover_URL || item.cover || '',
+                category: item.Category || item.category || '未分類',
+                status: item.Status || item.status || '想閱讀',
+            })) : [];
+            setBooks(normalized);
+            setError(null);
+        } catch (err) {
+            console.error('Failed to fetch books:', err);
+            setError('無法取得書籍資料，請檢查 GAS URL 或網路連線。');
+        } finally { setLoading(false); }
+    };
+
+    useEffect(() => {
+        fetchBooks();
+    }, [status]);
+
+    const handleAddBook = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newBook.title || isSubmitting) return;
+
+        setIsSubmitting(true);
+        const userId = localStorage.getItem('userId') || 'guest';
+        const bookId = `B-${Date.now()}`;
+
+        try {
+            const res = await AuthService.addBook({
+                Book_ID: bookId,
+                User_ID: userId,
+                Title: newBook.title,
+                Author: newBook.author || '未知',
+                Category: newBook.category,
+                Cover_URL: newBook.cover,
+                Status: status,
+                Chat_History: '[]',
+                Mind_Map_Data: '{}'
+            });
+
+            if (res.success) {
+                await fetchBooks();
+                setIsAddModalOpen(false);
+                setNewBook({ title: '', author: '', category: '自學', cover: '' });
+                alert('書籍已成功加入！');
+            } else {
+                alert(`儲存失敗：${res.message || res.error || '後端回傳錯誤'}`);
+            }
+        } catch (err) {
+            console.error('Add book error:', err);
+            alert('新增書籍失敗，請檢查網路或 GAS 設定');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const filteredByStatus = books.filter(book => book.status === status);
+    const categories = Array.from(new Set(filteredByStatus.map(b => b.category)));
+    const finalBooks = selectedCategory
+        ? filteredByStatus.filter(b => b.category === selectedCategory)
+        : filteredByStatus;
+
+    if (loading) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+                <Loader2 className="w-10 h-10 text-blue-500 animate-spin" />
+                <p className="text-slate-400 animate-pulse">正在載入您的書架...</p>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[400px] glass-card rounded-3xl p-8 text-center max-w-md mx-auto">
+                <p className="text-red-400 mb-4">{error}</p>
+                <button onClick={() => window.location.reload()} className="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl">重新整理</button>
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-6 sm:space-y-12 animate-fade-in px-2 sm:px-0">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
+                    {status === '想閱讀' ? '待讀清單' : '知識寶庫'}
+                </h1>
+                <div className="flex items-center gap-3 w-full sm:w-auto">
+                    {userId && !userEmail && (
+                        <button
+                            onClick={() => setIsBindModalOpen(true)}
+                            className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3.5 bg-slate-800 hover:bg-slate-700 text-blue-400 border border-blue-500/20 rounded-2xl font-bold transition-all min-h-[48px]"
+                        >
+                            <Mail className="w-5 h-5" />
+                            綁定 Email
+                        </button>
+                    )}
+                    <button
+                        onClick={() => setIsAddModalOpen(true)}
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3.5 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-bold transition-all shadow-lg shadow-blue-600/20 active:scale-95 group min-h-[48px]"
+                    >
+                        <Plus className="w-5 h-5 transition-transform group-hover:rotate-90" />
+                        新增書籍
+                    </button>
+                </div>
+            </div>
+
+            {/* 綁定 Email 彈窗 */}
+            {isBindModalOpen && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setIsBindModalOpen(false)} />
+                    <div className="relative w-full max-w-sm bg-[#1e293b] border border-white/10 rounded-3xl shadow-2xl p-8 animate-in fade-in zoom-in duration-300">
+                        <h2 className="text-xl font-bold text-white mb-2">綁定電子信箱</h2>
+                        <p className="text-slate-400 text-sm mb-6">備份您的閱讀紀錄，防止更換裝置時資料遺失。</p>
+                        <div className="space-y-4">
+                            <input
+                                type="email"
+                                value={bindEmail}
+                                onChange={e => setBindEmail(e.target.value)}
+                                placeholder="例如: user@example.com"
+                                className="w-full bg-slate-900/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                            />
+                            <button
+                                onClick={async () => {
+                                    if (!bindEmail || !userId) return;
+                                    const res = await AuthService.bindEmail(userId, bindEmail);
+                                    if (res.success) {
+                                        localStorage.setItem('userEmail', bindEmail);
+                                        setUserEmail(bindEmail);
+                                        setIsBindModalOpen(false);
+                                        alert('綁定成功！');
+                                    } else {
+                                        alert(res.message);
+                                    }
+                                }}
+                                className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl transition-all"
+                            >
+                                確認綁定
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <div className="flex flex-col gap-6">
+                <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar -mx-2 px-2 sm:mx-0 sm:px-0">
+                    <button
+                        onClick={() => setSelectedCategory(null)}
+                        className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all whitespace-nowrap min-h-[44px] flex items-center ${!selectedCategory ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'bg-white/5 text-slate-400 hover:text-white border border-white/10'}`}
+                    >
+                        全部書籍
+                    </button>
+                    {categories.map(cat => (
+                        <button
+                            key={cat}
+                            onClick={() => setSelectedCategory(cat)}
+                            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all whitespace-nowrap min-h-[44px] flex items-center ${selectedCategory === cat ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'bg-white/5 text-slate-400 hover:text-white border border-white/10'}`}
+                        >
+                            {cat}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            {finalBooks.length > 0 ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-8">
+                    {finalBooks.map(book => (
+                        <BookCard key={book.id} book={book} onClick={() => setSelectedBook(book)} />
+                    ))}
+                </div>
+            ) : (
+                <div className="text-center py-20 bg-white/5 rounded-3xl border border-dashed border-white/10">
+                    <p className="text-slate-500 text-sm">此分類目前沒有書籍</p>
+                </div>
+            )}
+
+            {selectedBook && (
+                <BookModal
+                    book={selectedBook}
+                    onClose={() => setSelectedBook(null)}
+                />
+            )}
+
+            {isAddModalOpen && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setIsAddModalOpen(false)} />
+                    <div className="relative w-full max-w-lg bg-[#1e293b] border border-white/10 rounded-3xl shadow-2xl p-8 animate-in fade-in zoom-in duration-300">
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-2xl font-bold text-white">新增書籍</h2>
+                            <button onClick={() => setIsAddModalOpen(false)} className="p-2 hover:bg-white/5 rounded-full text-slate-400">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleAddBook} className="space-y-5">
+                            <div className="space-y-2">
+                                <label className="text-xs font-semibold text-slate-500 uppercase ml-1">書名</label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={newBook.title}
+                                    onChange={e => setNewBook({ ...newBook, title: e.target.value })}
+                                    placeholder="輸入書名..."
+                                    className="w-full bg-slate-900/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className="text-xs font-semibold text-slate-500 uppercase ml-1">作者</label>
+                                    <input
+                                        type="text"
+                                        value={newBook.author}
+                                        onChange={e => setNewBook({ ...newBook, author: e.target.value })}
+                                        className="w-full bg-slate-900/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-semibold text-slate-500 uppercase ml-1">分類</label>
+                                    <select
+                                        value={newBook.category}
+                                        onChange={e => setNewBook({ ...newBook, category: e.target.value })}
+                                        className="w-full bg-slate-900/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 appearance-none"
+                                    >
+                                        <option value="自學">自學</option>
+                                        <option value="工作">工作</option>
+                                        <option value="生活">生活</option>
+                                        <option value="小說">小說</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-xs font-semibold text-slate-500 uppercase ml-1">封面圖片 URL</label>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={newBook.cover}
+                                        onChange={e => setNewBook({ ...newBook, cover: e.target.value })}
+                                        placeholder="https://..."
+                                        className="flex-1 bg-slate-900/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                                    />
+                                    {newBook.cover && (
+                                        <img src={newBook.cover} className="w-12 h-12 object-cover rounded-lg border border-white/10" alt="Preview" />
+                                    )}
+                                </div>
+                            </div>
+
+                            <button
+                                type="submit"
+                                disabled={isSubmitting}
+                                className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 mt-4"
+                            >
+                                {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                                儲存書籍
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+export default ShelfPage;
+
+
+
+=== src\services\AuthService.ts ===
+
+/**
+ * AuthService.ts
+ * 處理密碼哈希、API 請求與本地狀態管理
+ */
+
+// GAS 部署後的 Web App URL (優先使用環境變數)
+const GAS_URL = import.meta.env.VITE_GAS_URL || 'YOUR_GAS_WEB_APP_URL';
+
+export interface AuthResponse {
+    success: boolean;
+    message?: string;
+    userId?: string;
+    email?: string;
+    verified?: boolean;
+}
+
+export class AuthService {
+    /**
+     * 使用 Web Crypto API 進行 SHA-256 哈希
+     * @param password 原始密碼
+     */
+    static async hashPassword(password: string): Promise<string> {
+        const msgUint8 = new TextEncoder().encode(password);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        return hashHex;
+    }
+
+    /**
+     * 統一處理對 GAS 的請求，強制使用 text/plain 以避開 CORS 預檢 (OPTIONS)
+     */
+    static async gasRequest(action: string, payload: any): Promise<any> {
+        try {
+            const response = await fetch(GAS_URL, {
+                method: 'POST',
+                mode: 'cors',
+                headers: { 'Content-Type': 'text/plain' },
+                body: JSON.stringify({ action, ...payload })
+            });
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            return await response.json();
+        } catch (error) {
+            console.error(`GAS Request Error (${action}):`, error);
+            return { success: false, message: '網路連線失敗，請檢查 API 設定或網路' };
+        }
+    }
+
+    private static async request(action: string, payload: any): Promise<AuthResponse> {
+        return await this.gasRequest(action, payload);
+    }
+
+    static async login(userId: string, passwordHash: string): Promise<AuthResponse> {
+        return this.request('login', { id: userId, passHash: passwordHash });
+    }
+
+    static async signUp(userId: string, passwordHash: string, email?: string): Promise<AuthResponse> {
+        return this.request('signUp', { id: userId, passHash: passwordHash, email });
+    }
+
+    static async sendCode(email: string): Promise<AuthResponse> {
+        return this.request('sendVerificationCode', { email });
+    }
+
+    static async resetPassword(email: string, code: string, newPassHash: string): Promise<AuthResponse> {
+        return this.request('resetPassword', { email, code, newPassHash });
+    }
+
+    static async bindEmail(userId: string, email: string): Promise<AuthResponse> {
+        return this.request('bindEmail', { userId, email });
+    }
+
+    // 書籍管理 API
+    static async getBooks(userId: string) {
+        return this.gasRequest('getBooks', { User_ID: userId });
+    }
+
+    static async addBook(bookData: any) {
+        return this.gasRequest('addBook', bookData);
+    }
+
+    static async updateBook(bookData: any) {
+        return this.gasRequest('updateBook', bookData);
+    }
+
+    static async deleteBook(bookId: string) {
+        return this.gasRequest('delete', { Book_ID: bookId });
+    }
+
+    // 本地操作
+    static saveSession(userId: string, email?: string) {
+        localStorage.setItem('userId', userId);
+        if (email) localStorage.setItem('userEmail', email);
+    }
+
+    static logout() {
+        localStorage.removeItem('userId');
+        localStorage.removeItem('userEmail');
+        window.location.reload();
+    }
+}
+
+
+
+=== src\App.css ===
+
+#root {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: center;
+}
+
+.logo {
+  height: 6em;
+  padding: 1.5em;
+  will-change: filter;
+  transition: filter 300ms;
+}
+.logo:hover {
+  filter: drop-shadow(0 0 2em #646cffaa);
+}
+.logo.react:hover {
+  filter: drop-shadow(0 0 2em #61dafbaa);
+}
+
+@keyframes logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  a:nth-of-type(2) .logo {
+    animation: logo-spin infinite 20s linear;
+  }
+}
+
+.card {
+  padding: 2em;
+}
+
+.read-the-docs {
+  color: #888;
+}
+
+
+
+=== src\App.tsx ===
+
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import Navbar from './components/Navbar';
+import LoginPage from './pages/LoginPage';
+import ShelfPage from './pages/ShelfPage';
+
+function App() {
+  return (
+    <Router basename="/ai-reader-shelf">
+      <div className="min-h-screen bg-[#0f172a] text-slate-200 selection:bg-blue-500/30">
+        {/* 背景漸層 */}
+        <div className="fixed inset-0 pointer-events-none overflow-hidden">
+          <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-500/10 blur-[120px] rounded-full" />
+          <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-500/10 blur-[120px] rounded-full" />
+        </div>
+
+        <Navbar />
+
+        <main className="relative pt-24 pb-12 px-6 max-w-7xl mx-auto">
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/want-to-read" element={<ShelfPage status="想閱讀" />} />
+            <Route path="/already-read" element={<ShelfPage status="已閱讀" />} />
+            <Route path="/" element={<Navigate to="/want-to-read" replace />} />
+          </Routes>
+        </main>
+      </div>
+    </Router>
+  );
+}
+
+export default App;
+
+
+
+=== src\index.css ===
+
+@import "tailwindcss";
+
+:root {
+  background-color: #0f172a;
+  color: #f8fafc;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-image:
+    radial-gradient(at 0% 0%, hsla(253, 16%, 7%, 1) 0, transparent 50%),
+    radial-gradient(at 50% 0%, hsla(225, 39%, 30%, 1) 0, transparent 50%),
+    radial-gradient(at 100% 0%, hsla(339, 49%, 30%, 1) 0, transparent 50%);
+  background-attachment: fixed;
+  overflow-x: hidden;
+}
+
+/* 現代風卡片 */
+.glass-card {
+  @apply bg-white/5 backdrop-blur-lg border border-white/10 shadow-xl rounded-2xl;
+}
+
+/* 動畫定義 */
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+  }
+
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+/* 自定義捲軸 */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+
+
+=== src\main.tsx ===
+
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import './index.css'
+import App from './App.tsx'
+import { GoogleOAuthProvider } from '@react-oauth/google'
+
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+      <App />
+    </GoogleOAuthProvider>
+  </StrictMode>,
+)
+

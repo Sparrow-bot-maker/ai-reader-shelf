@@ -1,29 +1,20 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Library, BookCheck, Sparkles, User, LogOut } from 'lucide-react';
+import { Search, LogOut, BookOpen } from 'lucide-react';
 import UserLoginModal from './UserLoginModal';
 import { useState, useEffect } from 'react';
 
 const Navbar = () => {
     const location = useLocation();
-
-    const navItems = [
-        { path: '/want-to-read', label: '想閱讀', icon: Library },
-        { path: '/already-read', label: '已閱讀', icon: BookCheck },
-    ];
-
     const [isLoginOpen, setIsLoginOpen] = useState(false);
     const [userId, setUserId] = useState<string | null>(localStorage.getItem('userId'));
 
     useEffect(() => {
-        // 如果未登入且不在登入頁面，才自動開啟彈窗
         if (!userId && location.pathname !== '/login') {
             setIsLoginOpen(true);
         }
     }, [userId, location.pathname]);
 
-    const handleLogin = (id: string) => {
-        setUserId(id);
-    };
+    const handleLogin = (id: string) => setUserId(id);
 
     const handleLogout = () => {
         localStorage.removeItem('userId');
@@ -32,67 +23,43 @@ const Navbar = () => {
     };
 
     return (
-        <nav className="fixed top-0 left-0 right-0 z-50 glass-nav border-b border-white/5">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 sm:h-20 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-                    <div className="p-1.5 sm:p-2 bg-blue-500/20 rounded-lg hidden sm:block">
-                        <Sparkles className="w-5 h-5 sm:w-6 sm:h-6 text-blue-400" />
-                    </div>
-                    <span className="text-lg sm:text-xl font-bold tracking-tight text-white whitespace-nowrap">
-                        AI Reader<span className="text-blue-500">Shelf</span>
-                    </span>
+        <>
+            <header className="flex items-center justify-between border-b border-[#EDEDED] bg-white px-4 md:px-8 py-3 dark:bg-slate-900 dark:border-slate-800 z-50 sticky top-0">
+                <div className="flex items-center gap-4 md:gap-8">
+                    <Link to="/want-to-read" className="flex items-center gap-2 md:gap-3 cursor-pointer">
+                        <BookOpen className="text-blue-600 w-6 h-6 md:w-8 md:h-8" />
+                        <h2 className="text-[#1A1A1A] dark:text-white text-base md:text-lg font-bold tracking-tight hidden sm:block">AI Read Shelf</h2>
+                    </Link>
+                    <nav className="flex items-center gap-3 md:gap-6">
+                        <Link to="/want-to-read" className={`text-sm font-medium transition-colors ${location.pathname === '/want-to-read' ? 'text-[#1A1A1A] border-b-2 border-black pb-1' : 'text-slate-500 hover:text-[#1A1A1A] pb-1'}`}>想閱讀</Link>
+                        <Link to="/already-read" className={`text-sm font-medium transition-colors ${location.pathname === '/already-read' ? 'text-[#1A1A1A] border-b-2 border-black pb-1' : 'text-slate-500 hover:text-[#1A1A1A] pb-1'}`}>已閱讀</Link>
+                    </nav>
                 </div>
-
-                <div className="flex items-center gap-3 sm:gap-8 overflow-x-auto no-scrollbar">
-                    {navItems.map((item) => (
-                        <Link
-                            key={item.path}
-                            to={item.path}
-                            className={`flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-medium transition-all duration-300 hover:text-blue-400 min-h-[44px] px-1 ${location.pathname === item.path ? 'text-blue-400' : 'text-slate-400'
-                                }`}
-                        >
-                            <item.icon className="w-4 h-4 shrink-0" />
-                            <span className="whitespace-nowrap">{item.label}</span>
-                            {location.pathname === item.path && (
-                                <div className="absolute -bottom-1 left-0 right-0 h-0.5 bg-blue-500 shadow-[0_0_12px_rgba(59,130,246,0.5)]" />
-                            )}
-                        </Link>
-                    ))}
-                </div>
-
-                <div className="flex items-center gap-2 sm:gap-4 shrink-0">
-                    <div className="hidden md:flex items-center gap-3 px-3 py-1.5 bg-white/5 rounded-full border border-white/10 text-[10px] text-slate-400">
-                        <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                        ID: <span className="text-slate-200 font-mono">{userId ? (userId.length > 8 ? `${userId.substring(0, 5)}...` : userId) : 'NONE'}</span>
+                <div className="flex items-center gap-3 md:gap-4">
+                    <div className="relative hidden md:flex items-center">
+                        <Search className="absolute left-3 text-slate-400 w-4 h-4" />
+                        <input className="pl-10 pr-4 py-1.5 bg-slate-50 border border-[#EDEDED] rounded-lg text-sm w-48 lg:w-64 focus:ring-1 focus:ring-blue-600 focus:border-blue-600 outline-none transition-all" placeholder="Search your shelf..." type="text" />
                     </div>
-
-                    <button
-                        onClick={() => setIsLoginOpen(true)}
-                        className="p-2 sm:p-3 rounded-full hover:bg-white/5 transition-colors text-slate-400 hover:text-blue-400 relative group min-w-[44px] min-h-[44px] flex items-center justify-center"
-                        aria-label="User profile"
-                    >
-                        <User className="w-5 h-5" />
-                        <span className="absolute bottom-2 right-2 w-2 h-2 bg-blue-500 border-2 border-[#0f172a] rounded-full" />
-                    </button>
-
-                    {userId && (
-                        <button
-                            onClick={handleLogout}
-                            className="p-2 sm:p-3 rounded-full hover:bg-red-500/10 transition-colors text-slate-500 hover:text-red-400 min-w-[44px] min-h-[44px] flex items-center justify-center"
-                            aria-label="Logout"
-                        >
-                            <LogOut className="w-4 h-4" />
-                        </button>
+                    {userId ? (
+                        <div className="flex items-center gap-3">
+                            <div className="h-8 w-8 rounded-full bg-slate-200 overflow-hidden border border-[#EDEDED] flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-gray-200 transition-all">
+                                <span className="font-bold text-slate-600 text-xs">{userId.substring(0, 2).toUpperCase()}</span>
+                            </div>
+                            <button onClick={handleLogout} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                                <LogOut className="w-4 h-4" />
+                            </button>
+                        </div>
+                    ) : (
+                        <button onClick={() => setIsLoginOpen(true)} className="px-3 py-1.5 bg-[#1A1A1A] text-white text-sm font-semibold rounded-lg">Login</button>
                     )}
                 </div>
-            </div>
-
+            </header>
             <UserLoginModal
-                isOpen={isLoginOpen}
+                isOpen={isLoginOpen && !userId}
                 onClose={() => setIsLoginOpen(false)}
                 onLogin={handleLogin}
             />
-        </nav>
+        </>
     );
 };
 

@@ -14,71 +14,66 @@ const UserLoginModal = ({ isOpen, onClose, onLogin }: UserLoginModalProps) => {
     const handleGoogleSuccess = (credentialResponse: any) => {
         const decoded: any = jwtDecode(credentialResponse.credential);
         const googleId = decoded.email;
-
         AuthService.saveSession(googleId, googleId);
         onLogin(googleId);
         onClose();
-        window.location.reload(); // 重新整理以確保 ShelfPage 重新抓取資料
+        window.location.reload();
     };
 
     if (!isOpen) return null;
 
     return (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-md" onClick={onClose} />
+            <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" onClick={onClose} />
 
-            <div className="relative w-full max-w-md bg-[#1e293b] border border-white/10 rounded-3xl shadow-2xl p-8 animate-in fade-in zoom-in duration-300">
+            <div className="relative w-full max-w-md bg-white border border-gray-200 rounded-2xl shadow-2xl p-8 animate-in fade-in zoom-in duration-300">
                 <button
                     onClick={onClose}
-                    className="absolute top-4 right-4 p-2 hover:bg-white/5 rounded-full text-slate-400 hover:text-white transition-colors"
+                    className="absolute top-4 right-4 p-2 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-700 transition-colors"
                 >
                     <X className="w-5 h-5" />
                 </button>
 
                 <div className="flex flex-col items-center text-center mb-8">
-                    <div className="w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center mb-4 border border-blue-500/30">
-                        <User className="w-8 h-8 text-blue-400" />
+                    <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                        <User className="w-7 h-7 text-gray-600" />
                     </div>
-                    <h2 className="text-2xl font-bold text-white mb-2">登入以同步書架</h2>
-                    <p className="text-slate-400 text-sm">請自定義 ID 登入或使用 Google 帳戶</p>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-1">登入以同步書架</h2>
+                    <p className="text-gray-400 text-sm">使用 Google 帳戶或自訂 ID 登入</p>
                 </div>
 
-                <div className="space-y-6">
+                <div className="space-y-5">
                     <div className="flex justify-center">
                         <GoogleLogin
                             onSuccess={handleGoogleSuccess}
                             onError={() => console.log('Login Failed')}
                             useOneTap
-                            theme="filled_blue"
-                            shape="pill"
+                            theme="outline"
+                            shape="rectangular"
                             width="320"
                         />
                     </div>
 
-                    <div className="relative flex items-center py-2">
-                        <div className="flex-grow border-t border-white/10"></div>
-                        <span className="flex-shrink mx-4 text-slate-500 text-xs uppercase tracking-widest font-bold">或使用 ID 帳密登入</span>
-                        <div className="flex-grow border-t border-white/10"></div>
+                    <div className="relative flex items-center py-1">
+                        <div className="flex-grow border-t border-gray-200" />
+                        <span className="flex-shrink mx-4 text-gray-400 text-[10px] font-bold uppercase tracking-widest">或</span>
+                        <div className="flex-grow border-t border-gray-200" />
                     </div>
 
-                    <div className="flex justify-center">
-                        <button
-                            onClick={() => {
-                                onClose();
-                                // 導航至新的登入頁面
-                                const baseUrl = window.location.pathname.includes('/ai-reader-shelf') ? '/ai-reader-shelf/login' : '/login';
-                                window.location.pathname = baseUrl;
-                            }}
-                            className="w-full bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 border border-blue-500/20 font-bold py-4 rounded-2xl flex items-center justify-center gap-2 transition-all group"
-                        >
-                            <LogIn className="w-5 h-5 transition-transform group-hover:translate-x-1" />
-                            帳號密碼登入 / 註冊
-                        </button>
-                    </div>
+                    <button
+                        onClick={() => {
+                            onClose();
+                            const baseUrl = window.location.pathname.includes('/ai-reader-shelf') ? '/ai-reader-shelf/login' : '/login';
+                            window.location.pathname = baseUrl;
+                        }}
+                        className="w-full bg-gray-900 hover:bg-black text-white font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 transition-all"
+                    >
+                        <LogIn className="w-4 h-4" />
+                        帳號密碼登入 / 註冊
+                    </button>
                 </div>
 
-                <p className="mt-8 text-center text-[10px] text-slate-500 leading-relaxed">
-                    為了您的資安，現在我們改用密碼登入方式。<br />
+                <p className="mt-6 text-center text-[10px] text-gray-400 leading-relaxed">
                     首次使用的 ID 請點擊按鈕後進行「註冊」。
                 </p>
             </div>
