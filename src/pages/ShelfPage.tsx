@@ -186,8 +186,8 @@ const ShelfPage: React.FC<ShelfPageProps> = ({ status }) => {
                         key={label}
                         onClick={() => setSelectedCategory(value)}
                         className={`px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all whitespace-nowrap border ${selectedCategory === value
-                                ? 'bg-gray-900 text-white border-gray-900'
-                                : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400 hover:text-gray-800'
+                            ? 'bg-gray-900 text-white border-gray-900'
+                            : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400 hover:text-gray-800'
                             }`}
                     >
                         {label}
@@ -221,7 +221,7 @@ const ShelfPage: React.FC<ShelfPageProps> = ({ status }) => {
 
             {/* Book Modal */}
             {selectedBook && (
-                <BookModal book={selectedBook} onClose={() => setSelectedBook(null)} />
+                <BookModal book={selectedBook} onClose={() => setSelectedBook(null)} onUpdate={fetchBooks} />
             )}
 
             {/* Add Book Modal */}

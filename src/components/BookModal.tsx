@@ -22,11 +22,12 @@ interface Message {
 interface BookModalProps {
     book: Book;
     onClose: () => void;
+    onUpdate?: () => void;
 }
 
 const NODE_COLORS = ['#2563eb', '#7c3aed', '#0891b2', '#059669', '#d97706', '#dc2626'];
 
-const BookModal = ({ book, onClose }: BookModalProps) => {
+const BookModal = ({ book, onClose, onUpdate }: BookModalProps) => {
     const [messages, setMessages] = useState<Message[]>([
         { role: 'assistant', content: `你好！我是你的 AI 讀書助理。關於《${book.title}》，你想深入了解哪些內容呢？討論過程中，我會幫你把重點整理成思維導圖。` }
     ]);
@@ -168,13 +169,15 @@ const BookModal = ({ book, onClose }: BookModalProps) => {
         if (!window.confirm('確定刪除這本書嗎？無法復原！')) return;
         try {
             await AuthService.deleteBook(book.id);
+            if (onUpdate) onUpdate();
             onClose();
-            window.location.reload();
         } catch { alert('刪除失敗'); }
     };
 
     const handleToggleStatus = async () => {
         const newStatus = currentStatus === '想閱讀' ? '已閱讀' : '想閱讀';
+        // Optimistic UI update: 先在畫面上切換，讓使用者感覺到「即時」
+        setCurrentStatus(newStatus);
         try {
             await AuthService.updateBook({
                 Book_ID: book.id,
@@ -182,8 +185,13 @@ const BookModal = ({ book, onClose }: BookModalProps) => {
                 Title: book.title,
                 User_ID: localStorage.getItem('userId') || 'guest'
             });
-            setCurrentStatus(newStatus);
-        } catch { console.error('Toggle status error'); }
+            // 通知父層刷新背後的資料列表
+            if (onUpdate) onUpdate();
+        } catch {
+            console.error('Toggle status error');
+            // 如果失敗，再退回原本狀態
+            setCurrentStatus(book.status);
+        }
     };
 
     const handleClose = () => { handleSave(); onClose(); };
